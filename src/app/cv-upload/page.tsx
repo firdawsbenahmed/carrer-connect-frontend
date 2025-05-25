@@ -158,7 +158,7 @@ export default function CVUploadPage() {
   // Transform the raw results into DetailedCandidate format
   const handleProcessCVs = async () => {
     console.log("Starting handleProcessCVs...");
-    let progressInterval: NodeJS.Timeout;
+    let progressInterval: NodeJS.Timeout | undefined = undefined;
 
     if (files.length === 0) {
       toast({

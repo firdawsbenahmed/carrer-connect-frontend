@@ -1,201 +1,392 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { ArrowLeft, Upload, FileText, CheckCircle, AlertCircle, Loader2, Info } from "lucide-react"
-import Link from "next/link"
-import { processCVs } from "@/lib/process-cvs"
-import type { TemplateInfo } from "@/lib/template-detection"
-import { useCandidates } from "../../../context/candidates-context"
-import { useToast } from "../../../hooks/use-toast"
-import { Progress } from "@radix-ui/react-progress"
-import { Button } from "../../../components/button"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "../../../components/card"
-import { FileUploader } from "../../../components/file-uploader"
-import { TemplateBadge } from "../../../components/template-badge"
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/card";
+import {
+  ArrowLeft,
+  Upload,
+  FileText,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
+import { Button } from "@/components/button";
+import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
+import { useCandidates } from "@/context/candidates-context";
+import { FileUploader } from "@/components/file-uploader";
+import { Progress } from "@/components/progress";
+import { useRouter } from "next/navigation";
+
+interface ContactInfo {
+  name?: string;
+  email?: string;
+  phone?: string;
+  location?: string;
+}
+
+interface Skill {
+  skill: string;
+  importance?: string;
+}
+
+interface DetailedCandidate {
+  id: number;
+  name: string;
+  position: string;
+  email: string;
+  phone: string;
+  location: string;
+  matchScore: number;
+  skills: string[];
+  extractedSkillsCount: number;
+  requiredSkillsCount: number;
+  missingSkills: { name: string; importance: string }[];
+  selected: boolean;
+}
+
+interface RawResult {
+  contact_info?: ContactInfo;
+  target_job_title?: string;
+  score?: number;
+  matched_skills?: Skill[];
+  missing_skills?: Skill[];
+  extracted_skills_count?: number;
+  required_skills_count?: number;
+}
+
+// Counter for ensuring unique IDs
+let idCounter = 0;
+
+// Generate a truly unique ID by combining timestamp and counter
+const generateUniqueId = () => {
+  const timestamp = Date.now();
+  idCounter += 1;
+  return timestamp * 1000 + idCounter;
+};
 
 export default function CVUploadPage() {
-  const { toast } = useToast()
-  const candidatesContext = useCandidates()
-  const [files, setFiles] = useState<File[]>([])
-  const [isProcessing, setIsProcessing] = useState(false)
+  const { toast } = useToast();
+  const router = useRouter();
+  const candidatesContext = useCandidates();
+  const [files, setFiles] = useState<File[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [processedFiles, setProcessedFiles] = useState<{
-    success: string[]
-    failed: string[]
+    success: string[];
+    failed: string[];
   }>({
     success: [],
     failed: [],
-  })
-  const [templateInfo, setTemplateInfo] = useState<Record<string, TemplateInfo>>({})
-  const [processingProgress, setProcessingProgress] = useState(0)
+  });
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [currentProcessingFile, setCurrentProcessingFile] =
+    useState<string>("");
+  const [jobs, setJobs] = useState<{ code: string; title: string }[]>([]);
+  const [selectedJobCode, setSelectedJobCode] = useState<string | null>(null);
 
-  // Check if addCandidates is available
+  // Clear localStorage on component mount
   useEffect(() => {
-    if (!candidatesContext.addCandidates) {
-      console.error("addCandidates function is not available in the context")
-      toast({
-        title: "Application Error",
-        description: "There was an issue with the application. Please refresh the page.",
-        variant: "destructive",
-        duration: 5000,
-      })
-    }
-  }, [candidatesContext, toast])
+    console.log("Clearing localStorage on component mount...");
+    localStorage.removeItem("simpleCandidates");
+    localStorage.removeItem("detailedCandidates");
+  }, []);
+
+  // Fetch jobs from backend
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const response = await fetch("http://127.0.0.1:8000/jobs");
+        const data = await response.json();
+        console.log("Fetched jobs:", data);
+
+        // Check if data is an array directly, or check if it's in data.results
+        const jobsData = Array.isArray(data) ? data : data.results;
+
+        if (!jobsData) {
+          throw new Error("Jobs data not found in server response");
+        }
+
+        setJobs(jobsData);
+      } catch (error) {
+        console.error("Error fetching jobs:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch job titles. Please try again later.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchJobs();
+  }, [toast]);
+
+  const handleJobChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedCode = event.target.value;
+    setSelectedJobCode(selectedCode);
+    console.log("Selected Job Code:", selectedCode);
+  };
 
   const handleFilesSelected = (selectedFiles: File[]) => {
-    // Filter for PDF files only
     const pdfFiles = selectedFiles.filter(
-      (file) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"),
-    )
+      (file) =>
+        file.type === "application/pdf" ||
+        file.name.toLowerCase().endsWith(".pdf")
+    );
 
     if (pdfFiles.length !== selectedFiles.length) {
       toast({
         title: "Invalid file type",
         description: "Only PDF files are accepted",
         variant: "destructive",
-      })
+      });
     }
 
-    setFiles((prevFiles) => [...prevFiles, ...pdfFiles])
-  }
+    setFiles((prevFiles) => [...prevFiles, ...pdfFiles]);
+  };
 
   const removeFile = (fileName: string) => {
-    setFiles((prevFiles) => prevFiles.filter((file) => file.name !== fileName))
+    setFiles((prevFiles) => prevFiles.filter((file) => file.name !== fileName));
+  };
 
-    // Also remove template info if it exists
-    if (templateInfo[fileName]) {
-      const newTemplateInfo = { ...templateInfo }
-      delete newTemplateInfo[fileName]
-      setTemplateInfo(newTemplateInfo)
-    }
-  }
-
+  // Transform the raw results into DetailedCandidate format
   const handleProcessCVs = async () => {
+    console.log("Starting handleProcessCVs...");
+    let progressInterval: NodeJS.Timeout;
+
     if (files.length === 0) {
       toast({
         title: "No files selected",
         description: "Please select at least one CV to process",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    // Check if addCandidates is available
-    if (!candidatesContext.addCandidates) {
+    if (!selectedJobCode) {
       toast({
-        title: "Application Error",
-        description: "There was an issue with the application. Please refresh the page.",
+        title: "No job selected",
+        description: "Please select a job title before processing CVs",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    setIsProcessing(true)
-    setProcessedFiles({ success: [], failed: [] })
-    setProcessingProgress(0)
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append("resumes", file);
+    });
 
     try {
-      // Simulate progress updates
-      const progressInterval = setInterval(() => {
-        setProcessingProgress((prev) => {
-          const newProgress = prev + (5 + Math.floor(Math.random() * 10))
-          return newProgress >= 95 ? 95 : newProgress
-        })
-      }, 300)
+      setIsProcessing(true);
+      setProcessedFiles({ success: [], failed: [] });
+      setProcessingProgress(0);
 
-      // In a real app, we would send the files to a server for processing
-      // Here we'll use a mock function to simulate processing
-      const results = await processCVs(files)
+      // Set up progress simulation
+      const totalTime = files.length * 2000; // 2 seconds per PDF
+      const startTime = Date.now();
+      let currentFileIndex = 0;
 
-      clearInterval(progressInterval)
-      setProcessingProgress(100)
+      setCurrentProcessingFile(files[0].name);
 
-      // Add the successfully processed candidates to the context
-      if (results.candidates.length > 0 && candidatesContext.addCandidates) {
-        candidatesContext.addCandidates(results.candidates)
+      // Progress update interval
+      progressInterval = setInterval(() => {
+        const elapsedTime = Date.now() - startTime;
+        const calculatedProgress = Math.min(
+          (elapsedTime / totalTime) * 100,
+          99
+        );
+        setProcessingProgress(Math.round(calculatedProgress));
+
+        // Update current processing file every 2 seconds
+        const newFileIndex = Math.floor(elapsedTime / 2000);
+        if (newFileIndex !== currentFileIndex && newFileIndex < files.length) {
+          currentFileIndex = newFileIndex;
+          setCurrentProcessingFile(files[currentFileIndex].name);
+        }
+      }, 100); // Update every 100ms for smooth animation
+
+      console.log("Sending request to backend...");
+      const response = await fetch(
+        `http://127.0.0.1:8000/rank_resumes/${selectedJobCode}`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to process CVs");
       }
 
-      // Update the processed files state
-      setProcessedFiles({
-        success: results.success,
-        failed: results.failed,
-      })
+      const rawResults = await response.json();
+      console.log("Response from server:", rawResults);
 
-      // Update template info
-      setTemplateInfo(results.templateInfo)
+      // Check if response has the results array
+      const resultsArray = rawResults.results;
+      if (!Array.isArray(resultsArray)) {
+        throw new Error(
+          "Server response is not in the expected format - missing results array"
+        );
+      }
+
+      // Transform the raw results into DetailedCandidate format with proper typing
+      const validCandidates = resultsArray
+        .map((result: RawResult, index: number) => {
+          if (!result) {
+            console.warn(`Empty result at index ${index}`);
+            return null;
+          }
+
+          return {
+            id: generateUniqueId(),
+            name: result.contact_info?.name || `Candidate ${index + 1}`,
+            position: result.target_job_title || "Not Specified",
+            email: result.contact_info?.email || "Not Available",
+            phone: result.contact_info?.phone || "Not Available",
+            location: result.contact_info?.location || "Not Specified",
+            matchScore: result.score || 0,
+            skills:
+              result.matched_skills?.map((skill: Skill) => skill.skill) || [],
+            extractedSkillsCount: result.extracted_skills_count || 0,
+            requiredSkillsCount: result.required_skills_count || 0,
+            missingSkills:
+              result.missing_skills?.map((skill: Skill) => ({
+                name: skill.skill,
+                importance: skill.importance || "medium",
+              })) || [],
+            selected: false,
+          };
+        })
+        .filter(
+          (candidate): candidate is DetailedCandidate => candidate !== null
+        );
 
       toast({
-        title: "CVs processed",
-        description: `Successfully processed ${results.success.length} out of ${files.length} CVs`,
-        duration: 5000,
-      })
+        title: "CVs processed successfully",
+        description: "Redirecting to the ranking page...",
+        variant: "default",
+      });
+
+      if (candidatesContext.addCandidates) {
+        // Set progress to 100% on success
+        setProcessingProgress(100);
+        candidatesContext.addCandidates(validCandidates, rawResults.report_url);
+
+        toast({
+          title: "CVs processed successfully",
+          description: "Redirecting to the ranking page...",
+          duration: 1500,
+        });
+
+        // Redirect to ranking page after a short delay to show the toast
+        setTimeout(() => {
+          router.push("/cv-ranking");
+        }, 1500);
+      }
     } catch (error) {
-      console.error("Error processing CVs:", error)
+      console.error("Error processing CVs:", error);
       toast({
         title: "Processing failed",
         description: "An error occurred while processing the CVs",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsProcessing(false)
+      // Clear the progress interval
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+      setIsProcessing(false);
     }
-  }
+  };
 
   const clearAll = () => {
-    setFiles([])
-    setProcessedFiles({ success: [], failed: [] })
-    setTemplateInfo({})
-    setProcessingProgress(0)
-  }
-
-  // Calculate template statistics
-  const templateStats = Object.values(templateInfo).reduce(
-    (acc, template) => {
-      acc[template.id] = (acc[template.id] || 0) + 1
-      return acc
-    },
-    {} as Record<string, number>,
-  )
-
-  // Calculate average confidence
-  const avgConfidence = Object.values(templateInfo).length
-    ? Math.round(
-      Object.values(templateInfo).reduce((sum, t) => sum + t.confidence, 0) / Object.values(templateInfo).length,
-    )
-    : 0
+    setFiles([]);
+    setProcessedFiles({ success: [], failed: [] });
+    setProcessingProgress(0);
+  };
 
   return (
-    <div className="container mx-auto py-8 px-4 sm:px-6 md:px-8">
-      <div className="flex flex-col gap-6">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" asChild>
-            <Link href="/cv-ranking">
-              <ArrowLeft className="h-4 w-4" />
+    <div className='container mx-auto py-8 px-4 sm:px-6 md:px-8'>
+      <div className='flex flex-col gap-6'>
+        <div className='flex items-center gap-2'>
+          <Button variant='outline' size='icon' asChild>
+            <Link href='/cv-ranking'>
+              <ArrowLeft className='h-4 w-4' />
             </Link>
           </Button>
-          <h1 className="text-3xl font-bold">CV Upload</h1>
+          <h1 className='text-3xl font-bold'>CV Upload</h1>
+        </div>
+
+        {/* Job Selection Dropdown */}
+        <div className='mb-4'>
+          <label
+            htmlFor='job-select'
+            className='block text-sm font-medium text-gray-700'
+          >
+            Select a Job Title
+          </label>
+          <select
+            id='job-select'
+            className='mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm'
+            onChange={handleJobChange}
+            value={selectedJobCode || ""}
+          >
+            <option value='' disabled>
+              -- Select a Job --
+            </option>
+            {jobs.map((job) => (
+              <option key={job.code} value={job.code}>
+                {job.title}
+              </option>
+            ))}
+          </select>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle>Upload CVs</CardTitle>
-            <CardDescription>Upload multiple CV files to process and add to the ranking system</CardDescription>
+            <CardDescription>
+              Upload multiple CV files to process and add to the ranking system
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <FileUploader onFilesSelected={handleFilesSelected} accept=".pdf" multiple={true} />
+            <FileUploader
+              onFilesSelected={handleFilesSelected}
+              accept='.pdf'
+              multiple={true}
+            />
 
             {files.length > 0 && (
-              <div className="mt-6">
-                <h3 className="text-sm font-medium mb-2">Selected Files ({files.length})</h3>
-                <div className="border rounded-md divide-y">
+              <div className='mt-6'>
+                <h3 className='text-sm font-medium mb-2'>
+                  Selected Files ({files.length})
+                </h3>
+                <div className='border rounded-md divide-y'>
                   {files.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-3">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{file.name}</span>
-                        <span className="text-xs text-muted-foreground">({(file.size / 1024).toFixed(1)} KB)</span>
-                        {templateInfo[file.name] && <TemplateBadge template={templateInfo[file.name]} />}
+                    <div
+                      key={index}
+                      className='flex items-center justify-between p-3'
+                    >
+                      <div className='flex items-center gap-2'>
+                        <FileText className='h-4 w-4 text-muted-foreground' />
+                        <span className='text-sm'>{file.name}</span>
+                        <span className='text-xs text-muted-foreground'>
+                          ({(file.size / 1024).toFixed(1)} KB)
+                        </span>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => removeFile(file.name)} disabled={isProcessing}>
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        onClick={() => removeFile(file.name)}
+                        disabled={isProcessing}
+                      >
                         Remove
                       </Button>
                     </div>
@@ -205,70 +396,38 @@ export default function CVUploadPage() {
             )}
 
             {isProcessing && (
-              <div className="mt-6 space-y-2">
-                <div className="flex justify-between text-sm">
+              <div className='mt-6 space-y-2'>
+                <div className='flex justify-between text-sm'>
                   <span>Processing CVs...</span>
                   <span>{processingProgress}%</span>
                 </div>
-                <Progress value={processingProgress} className="h-2" />
+                <Progress value={processingProgress} className='h-2' />
+                {currentProcessingFile && (
+                  <div className='text-sm text-gray-900 mt-2 flex items-center'>
+                    <Loader2 className='h-3 w-3 animate-spin mr-2' />
+                    Processing: {currentProcessingFile}
+                  </div>
+                )}
               </div>
             )}
 
-            {Object.keys(templateInfo).length > 0 && (
-              <div className="mt-6 p-4 bg-muted/30 rounded-md">
-                <h3 className="text-sm font-medium flex items-center gap-1 mb-3">
-                  <Info className="h-4 w-4 text-primary" />
-                  Template Detection Results
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm mb-2">Detected Templates:</p>
-                    <div className="space-y-1">
-                      {Object.entries(templateStats).map(([templateId, count]) => (
-                        <div key={templateId} className="flex items-center justify-between text-sm">
-                          <span>{templateId.replace("-", " ").replace(/\b\w/g, (l) => l.toUpperCase())}</span>
-                          <span className="font-medium">{count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-sm mb-2">Detection Statistics:</p>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Average Confidence</span>
-                        <span className="font-medium">{avgConfidence}%</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Total Files Analyzed</span>
-                        <span className="font-medium">{Object.keys(templateInfo).length}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Unknown Formats</span>
-                        <span className="font-medium">{templateStats["unknown"] || 0}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {(processedFiles.success.length > 0 || processedFiles.failed.length > 0) && (
-              <div className="mt-6 space-y-4">
+            {(processedFiles.success.length > 0 ||
+              processedFiles.failed.length > 0) && (
+              <div className='mt-6 space-y-4'>
                 {processedFiles.success.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-medium flex items-center gap-1 text-green-600 mb-2">
-                      <CheckCircle className="h-4 w-4" />
+                    <h3 className='text-sm font-medium flex items-center gap-1 text-gray-900 mb-2'>
+                      <CheckCircle className='h-4 w-4 text-gray-900' />
                       Successfully Processed ({processedFiles.success.length})
                     </h3>
-                    <div className="border border-green-200 bg-green-50 rounded-md divide-y">
+                    <div className='border border-gray-200 bg-gray-50 rounded-md divide-y'>
                       {processedFiles.success.map((fileName, index) => (
-                        <div key={index} className="p-2 text-sm flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                        <div
+                          key={index}
+                          className='p-2 text-sm flex items-center justify-between'
+                        >
+                          <div className='flex items-center gap-2'>
                             <span>{fileName}</span>
-                            {templateInfo[fileName] && (
-                              <TemplateBadge template={templateInfo[fileName]} showConfidence={true} />
-                            )}
                           </div>
                         </div>
                       ))}
@@ -278,13 +437,13 @@ export default function CVUploadPage() {
 
                 {processedFiles.failed.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-medium flex items-center gap-1 text-red-600 mb-2">
-                      <AlertCircle className="h-4 w-4" />
+                    <h3 className='text-sm font-medium flex items-center gap-1 text-red-600 mb-2'>
+                      <AlertCircle className='h-4 w-4' />
                       Failed to Process ({processedFiles.failed.length})
                     </h3>
-                    <div className="border border-red-200 bg-red-50 rounded-md divide-y">
+                    <div className='border border-red-200 bg-red-50 rounded-md divide-y'>
                       {processedFiles.failed.map((fileName, index) => (
-                        <div key={index} className="p-2 text-sm">
+                        <div key={index} className='p-2 text-sm'>
                           {fileName}
                         </div>
                       ))}
@@ -294,19 +453,26 @@ export default function CVUploadPage() {
               </div>
             )}
           </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={clearAll} disabled={isProcessing || files.length === 0}>
+          <CardFooter className='flex justify-between'>
+            <Button
+              variant='outline'
+              onClick={clearAll}
+              disabled={isProcessing || files.length === 0}
+            >
               Clear All
             </Button>
-            <Button onClick={handleProcessCVs} disabled={isProcessing || files.length === 0}>
+            <Button
+              onClick={handleProcessCVs}
+              disabled={isProcessing || files.length === 0}
+            >
               {isProcessing ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                   Processing...
                 </>
               ) : (
                 <>
-                  <Upload className="mr-2 h-4 w-4" />
+                  <Upload className='mr-2 h-4 w-4' />
                   Process CVs
                 </>
               )}
@@ -315,13 +481,13 @@ export default function CVUploadPage() {
         </Card>
 
         {processedFiles.success.length > 0 && (
-          <div className="flex justify-center">
+          <div className='flex justify-center'>
             <Button asChild>
-              <Link href="/cv-ranking">Go to CV Ranking</Link>
+              <Link href='/cv-ranking'>Go to CV Ranking</Link>
             </Button>
           </div>
         )}
       </div>
     </div>
-  )
+  );
 }

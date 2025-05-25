@@ -1,4 +1,4 @@
-import NavBar from "../../components/NavBar";
+import LandingNavBar from "../../components/LandingNavBar";
 import Definition from "../../components/Definition";
 import Stats from "../../components/Stats";
 import Features from "../../components/Features";
@@ -9,7 +9,7 @@ import Footer from "../../components/Footer";
 export default function Home() {
   return (
     <div className='flex flex-col items-center scroll-smooth'>
-      <NavBar />
+      <LandingNavBar />
       <Definition />
       <Stats />
       <Features />

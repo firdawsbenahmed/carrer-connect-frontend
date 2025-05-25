@@ -3,13 +3,6 @@ import Image from "next/image";
 import Link from "next/link";
 
 function NavBar() {
-  const handleScroll = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  };
-
   return (
     <div className='flex items-center justify-between w-full h-16 px-4 md:px-8'>
       <div className='flex items-center'>
@@ -18,29 +11,20 @@ function NavBar() {
       </div>
 
       <ul className='hidden md:flex flex-row justify-center flex-1'>
-        <li
-          className='mx-4 cursor-pointer hover:text-gray-600'
-          onClick={() => handleScroll("features")}
-        >
-          Features
-        </li>
-        <li
-          className='mx-4 cursor-pointer hover:text-gray-600'
-          onClick={() => handleScroll("how-it-works")}
-        >
-          How it Works
-        </li>
-        <li
-          className='mx-4 cursor-pointer hover:text-gray-600'
-          onClick={() => handleScroll("testimonials")}
-        >
-          Testimonials
-        </li>
+        <Link href='/' className='mx-4 hover:text-gray-600'>
+          Home
+        </Link>
+        <Link href='/careermatcher' className='mx-4 hover:text-gray-600'>
+          Career Matcher
+        </Link>
+        <Link href='/cv-upload' className='mx-4 hover:text-gray-600'>
+          CV Ranking
+        </Link>
       </ul>
 
-      <div className="flex flex-row">
-        <Link href="/careermatcher">
-          <button className="px-4 py-2 text-white bg-black rounded-xl hover:bg-gray-600">Get Started</button>
+      <div className='flex items-center'>
+        <Link href='/' className='px-4 py-2 text-black hover:text-gray-600'>
+          Back to Home
         </Link>
       </div>
     </div>

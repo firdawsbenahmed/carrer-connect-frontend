@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "../../../../components/button";
 import {
   Card,
   CardContent,
@@ -9,15 +9,12 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+} from "../../../../components/card";
+import { Badge } from "../../../../components/badge";
 import {
   ArrowLeft,
-  Briefcase,
-  Calendar,
   CheckCircle,
   Download,
-  GraduationCap,
   Mail,
   MapPin,
   Phone,
@@ -194,9 +191,9 @@ export default function CVDetailsPage() {
                   Skills
                 </h3>
                 <div className='flex flex-wrap gap-2'>
-                  {candidate.skills.matched.map((skill, index) => (
+                  {candidate.skills.map((skill: string, index: number) => (
                     <Badge key={index} variant='secondary'>
-                      {skill.skill}
+                      {skill}
                     </Badge>
                   ))}
                 </div>
@@ -207,12 +204,14 @@ export default function CVDetailsPage() {
                   Missing Skills
                 </h3>
                 <div className='flex flex-wrap gap-2'>
-                  {candidate.skills.missing.slice(0, 10).map((skill, index) => (
-                    <Badge key={index} variant='destructive'>
-                      {skill.skill}
-                    </Badge>
-                  ))}
-                  {candidate.skills.missing.length > 10 && (
+                  {candidate.missingSkills
+                    ?.slice(0, 10)
+                    .map((skill, index: number) => (
+                      <Badge key={index} variant='destructive'>
+                        {skill.name}
+                      </Badge>
+                    ))}
+                  {(candidate.missingSkills?.length || 0) > 10 && (
                     <Badge variant='destructive'>...</Badge>
                   )}
                 </div>

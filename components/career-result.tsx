@@ -9,6 +9,7 @@ interface CareerResultProps {
     title: string;
     matchScore: number;
     keySkills: string[];
+    missingSkills: string[];
     salary: string;
   };
 }
@@ -45,15 +46,43 @@ export function CareerResult({ career }: CareerResultProps) {
           </div>
         </div>
 
-        <div>
-          <h4 className='text-sm font-medium mb-2'>Key Skills</h4>
-          <div className='flex flex-wrap gap-2'>
-            {career.keySkills.map((skill) => (
-              <Badge key={skill} variant='outline' className='px-2.5 py-0.5'>
-                {skill}
-              </Badge>
-            ))}
+        <div className='space-y-4'>
+          <div>
+            <h4 className='text-sm font-medium mb-2'>Key Skills</h4>
+            <div className='flex flex-wrap gap-2'>
+              {(career.keySkills || []).map((skill) => (
+                <Badge
+                  key={skill}
+                  variant='secondary'
+                  className='px-2.5 py-0.5'
+                >
+                  {skill || "Unknown Skill"}
+                </Badge>
+              ))}
+            </div>
           </div>
+
+          {career.missingSkills?.length > 0 && (
+            <div>
+              <h4 className='text-sm font-medium mb-2'>Missing Skills</h4>
+              <div className='flex flex-wrap gap-2'>
+                {(career.missingSkills || []).slice(0, 3).map((skill, idx) => (
+                  <Badge
+                    key={idx}
+                    variant='destructive'
+                    className='px-2.5 py-0.5'
+                  >
+                    {skill || "Unknown Skill"}
+                  </Badge>
+                ))}
+                {(career.missingSkills || []).length > 3 && (
+                  <Badge variant='destructive' className='px-2.5 py-0.5'>
+                    ...
+                  </Badge>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
       <CardFooter className='border-t pt-4'>

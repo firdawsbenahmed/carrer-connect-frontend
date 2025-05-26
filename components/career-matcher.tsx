@@ -31,11 +31,9 @@ import { CareerResult } from "./career-result";
 import { Textarea } from "./textarea";
 import { Progress } from "@radix-ui/react-progress";
 import {
-  USE_REAL_API,
   API_BASE_URL,
   API_ENDPOINTS,
   AI_MODELS,
-  MODEL_DUMMY_DATA,
   MAX_FILE_SIZE,
   ACCEPTED_FILE_TYPES,
   MIN_TEXT_LENGTH,
@@ -46,6 +44,7 @@ interface Career {
   title: string;
   matchScore: number;
   keySkills: string[];
+  missingSkills: string[];
   salary: string;
 }
 
@@ -56,6 +55,21 @@ interface AIModel {
   icon: React.ReactNode;
   accuracy: string;
   speed: string;
+}
+
+// Add this interface near the top of the file with other interfaces
+interface APIResponse {
+  recommendations: Array<{
+    title: string;
+    matchScore: number;
+    keySkills: Array<{
+      name: string;
+      similarity: number;
+      type: string;
+    }>;
+    missingSkills: string[];
+    salary: string;
+  }>;
 }
 
 export function CareerMatcher() {
@@ -77,7 +91,7 @@ export function CareerMatcher() {
   // Current model's careers
   const careers = careerResults[selectedModel];
   const [error, setError] = useState<string | null>(null);
-
+  // Base URL is already imported from config
   // CV upload states
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -145,54 +159,64 @@ export function CareerMatcher() {
     setError(null);
 
     try {
-      // Check if we already have results for this model
-      if (careerResults[selectedModel].length > 0) {
-        setShowResults(true);
+      const endpoint =
+        inputMode === "cv"
+          ? `${API_BASE_URL}${API_ENDPOINTS[selectedModel]}/multipart/form-data`
+          : `${API_BASE_URL}${API_ENDPOINTS[selectedModel]}`;
+      console.log("Using endpoint:", endpoint);
+      console.log("Selected model:", selectedModel);
+      console.log("Input mode:", inputMode);
+
+      const requestOptions =
+        inputMode === "cv" && cvFile
+          ? {
+              method: "POST",
+              body: (() => {
+                const formData = new FormData();
+                formData.append("file", cvFile);
+                return formData;
+              })(),
+            }
+          : {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ text: userText }),
+            };
+
+      const response = await fetch(endpoint, requestOptions);
+
+      if (!response.ok) {
+        throw new Error("Failed to analyze career matches");
+      }
+
+      const data = (await response.json()) as APIResponse;
+      console.log(data);
+      if (!data.recommendations || data.recommendations.length === 0) {
+        setError(
+          "No career matches found. Try providing more details about your skills and experience."
+        );
         return;
       }
 
-      if (!USE_REAL_API) {
-        // Use dummy data
-        const dummyData = MODEL_DUMMY_DATA[selectedModel];
-        setCareerResults((prev) => ({
-          ...prev,
-          [selectedModel]: dummyData,
-        }));
-        setShowResults(true);
-      } else {
-        // Use real API
-        const endpoint = `${API_BASE_URL}${API_ENDPOINTS[selectedModel]}`;
+      const transformedData = data.recommendations.map((rec) => ({
+        title: rec.title,
+        matchScore: rec.matchScore,
+        keySkills:
+          rec.keySkills?.map((skill) =>
+            // Check if skill is a string or an object
+            typeof skill === "string" ? skill : skill.name
+          ) || [],
+        missingSkills: rec.missingSkills || [],
+        salary: rec.salary,
+      }));
 
-        let response;
-        if (inputMode === "cv" && cvFile) {
-          const formData = new FormData();
-          formData.append("file", cvFile);
-
-          response = await fetch(endpoint, {
-            method: "POST",
-            body: formData,
-          });
-        } else {
-          response = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ text: userText }),
-          });
-        }
-
-        if (!response.ok) {
-          throw new Error("Failed to analyze career matches");
-        }
-
-        const data = await response.json();
-        setCareerResults((prev) => ({
-          ...prev,
-          [selectedModel]: data,
-        }));
-        setShowResults(true);
-      }
+      setCareerResults((prev) => ({
+        ...prev,
+        [selectedModel]: transformedData,
+      }));
+      setShowResults(true);
     } catch (error) {
       console.error("Error:", error);
       setError(

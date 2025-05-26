@@ -71,6 +71,8 @@ export type CandidatesContextType = {
   detailedCandidates: DetailedCandidate[];
   reportUrl: string | null;
   addCandidates: (candidates: DetailedCandidate[], reportUrl: string) => void;
+  toggleCandidateSelection: (id: number) => void;
+  getDetailedCandidate: (id: number) => DetailedCandidate | undefined;
 };
 
 // Create the context
@@ -137,6 +139,8 @@ export function CandidatesProvider({ children }: { children: ReactNode }) {
     detailedCandidates,
     reportUrl,
     addCandidates,
+    toggleCandidateSelection,
+    getDetailedCandidate,
   };
 
   return (

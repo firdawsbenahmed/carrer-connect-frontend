@@ -1,6 +1,5 @@
 // API Configuration
-export const USE_REAL_API = false; // Toggle between real API and dummy data
-export const API_BASE_URL = "http://localhost:8000/api"; // Change this to your actual API base URL
+export const API_BASE_URL = "https://7n3n1z40-8000.euw.devtunnels.ms/api";
 
 export const API_ENDPOINTS = {
   "Onet-dataset": "/analyze/onet",
@@ -13,84 +12,11 @@ export interface CareerMatch {
   description: string;
   matchScore: number;
   keySkills: string[];
+  missingSkills: string[];
   salary: string;
   growth: string;
   image: string;
 }
-
-// Dummy data for each model
-export const MODEL_DUMMY_DATA: Record<
-  keyof typeof API_ENDPOINTS,
-  CareerMatch[]
-> = {
-  "Onet-dataset": [
-    {
-      title: "Software Engineer",
-      description:
-        "Design and develop software solutions for various platforms and needs.",
-      matchScore: 96,
-      keySkills: ["Java", "Python", "System Design", "Algorithm Development"],
-      salary: "$85,000 - $150,000",
-      growth: "15% (Much faster than average)",
-      image: "/placeholder.svg?height=80&width=80",
-    },
-    {
-      title: "DevOps Engineer",
-      description:
-        "Manage infrastructure and deployment pipelines for software applications.",
-      matchScore: 92,
-      keySkills: ["Docker", "Kubernetes", "CI/CD", "Cloud Platforms"],
-      salary: "$95,000 - $160,000",
-      growth: "12% (Faster than average)",
-      image: "/placeholder.svg?height=80&width=80",
-    },
-  ],
-  "Stack-Overflow": [
-    {
-      title: "Full Stack Developer",
-      description: "Build complete web applications from frontend to backend.",
-      matchScore: 94,
-      keySkills: ["JavaScript", "React", "Node.js", "SQL"],
-      salary: "$80,000 - $140,000",
-      growth: "13% (Faster than average)",
-      image: "/placeholder.svg?height=80&width=80",
-    },
-    {
-      title: "Cloud Solutions Architect",
-      description: "Design and implement cloud infrastructure solutions.",
-      matchScore: 88,
-      keySkills: ["AWS", "Azure", "Cloud Architecture", "System Design"],
-      salary: "$110,000 - $180,000",
-      growth: "10% (Faster than average)",
-      image: "/placeholder.svg?height=80&width=80",
-    },
-  ],
-  ESCOU: [
-    {
-      title: "Systems Analyst",
-      description: "Analyze and optimize IT systems and business processes.",
-      matchScore: 90,
-      keySkills: [
-        "System Analysis",
-        "Project Management",
-        "Business Process",
-        "Technical Documentation",
-      ],
-      salary: "$75,000 - $130,000",
-      growth: "11% (Faster than average)",
-      image: "/placeholder.svg?height=80&width=80",
-    },
-    {
-      title: "Data Engineer",
-      description: "Build and maintain data pipelines and infrastructure.",
-      matchScore: 86,
-      keySkills: ["SQL", "Python", "ETL", "Big Data"],
-      salary: "$90,000 - $160,000",
-      growth: "14% (Much faster than average)",
-      image: "/placeholder.svg?height=80&width=80",
-    },
-  ],
-} as const;
 
 // AI model configurations
 export const AI_MODELS = [
